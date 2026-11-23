@@ -1,0 +1,2034 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StaffFlow — Project Pipeline & Client Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            surface: '#ffffff',
+            canvas: '#f8fafc',
+            borderSubtle: '#e2e8f0',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom scrollbar for clean minimalist look */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .drag-over-col {
+      background-color: #eef2ff !important;
+      border-color: #6366f1 !important;
+      box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.25);
+    }
+    .dragging-card {
+      opacity: 0.45;
+      transform: scale(0.98);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen flex flex-col selection:bg-slate-900 selection:text-white">
+
+  <!-- Toast Notification Container (No alert() used) -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <!-- Brand / Workspace Title -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center shadow-sm">
+          <i data-lucide="layers" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold tracking-tight text-slate-900">StaffFlow</h1>
+            <span class="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+              Local Synced
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 hidden sm:block">Client Intake & Delivery Pipeline</p>
+        </div>
+      </div>
+
+      <!-- Right Controls: Currency Switcher, DB/Export Config, New Project -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Currency Switcher -->
+        <div class="inline-flex items-center rounded-lg bg-slate-100 p-0.5 border border-slate-200" title="Toggle Display Currency">
+          <button type="button" id="curr-php" onclick="setCurrency('PHP')" class="px-2.5 py-1 text-xs font-semibold rounded-md transition-all">
+            ₱ PHP
+          </button>
+          <button type="button" id="curr-usd" onclick="setCurrency('USD')" class="px-2.5 py-1 text-xs font-semibold rounded-md transition-all">
+            $ USD
+          </button>
+        </div>
+
+        <!-- Database / JSON Config Button -->
+        <button type="button" onclick="openDbModal()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-colors" title="Database & JSON Backup">
+          <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+          <span class="hidden md:inline">DB / JSON</span>
+        </button>
+
+        <!-- Add New Project CTA -->
+        <button type="button" onclick="openProjectModal()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-sm transition-all active:scale-[0.99]">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span>New Project</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- KPI Summary Row -->
+    <section id="kpi-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Populated dynamically via JS -->
+    </section>
+
+    <!-- Toolbar: Status Tabs + Search + View Switcher -->
+    <section class="bg-white rounded-xl border border-slate-200 p-3 sm:p-4 shadow-xs space-y-3">
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        
+        <!-- Category Filter Tabs -->
+        <div id="status-tabs" class="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 no-scrollbar">
+          <!-- Populated dynamically via JS -->
+        </div>
+
+        <!-- Search, Sort & Layout Toggle -->
+        <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+          <!-- Search Input -->
+          <div class="relative flex-1 sm:w-60">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input 
+              type="text" 
+              id="search-input" 
+              oninput="handleSearch(this.value)"
+              placeholder="Search project, client, note... (/)" 
+              class="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:bg-white focus:border-slate-900 transition-colors"
+            />
+            <button id="clear-search-btn" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700" title="Clear search">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <!-- Sort Select -->
+          <select id="sort-select" onchange="handleSort(this.value)" class="px-3 py-2 text-xs sm:text-sm bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-slate-900 cursor-pointer">
+            <option value="updated">Sort: Newest / Recent</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="client-asc">Client: A → Z</option>
+            <option value="note-recent">Recently Updated Note</option>
+          </select>
+
+          <!-- Card Density Toggle (Compact vs Detailed) -->
+          <div id="density-toggle" class="inline-flex items-center rounded-lg bg-slate-100 p-1 border border-slate-200 shrink-0" title="Toggle Card Density">
+            <button type="button" id="density-compact-btn" onclick="setCardDensity('compact')" class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all">
+              <i data-lucide="rows-3" class="w-3.5 h-3.5"></i>
+              <span class="hidden xl:inline">Compact</span>
+            </button>
+            <button type="button" id="density-detailed-btn" onclick="setCardDensity('detailed')" class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all">
+              <i data-lucide="layout-list" class="w-3.5 h-3.5"></i>
+              <span class="hidden xl:inline">Detailed</span>
+            </button>
+          </div>
+
+          <!-- View Mode Toggle (Board vs List) -->
+          <div class="inline-flex items-center rounded-lg bg-slate-100 p-1 border border-slate-200 shrink-0">
+            <button type="button" id="view-board-btn" onclick="setViewMode('board')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all" title="Kanban / Card Grid View">
+              <i data-lucide="kanban" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">Board</span>
+            </button>
+            <button type="button" id="view-list-btn" onclick="setViewMode('list')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all" title="Compact Table List View">
+              <i data-lucide="list" class="w-3.5 h-3.5"></i>
+              <span class="hidden sm:inline">List</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Filter Chips & Active Filter Reset Row -->
+      <div id="quick-filters-bar" class="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </section>
+
+    <!-- Main Project Listing Area -->
+    <section id="projects-container" class="min-h-[420px]">
+      <!-- Rendered dynamically by renderProjects() -->
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-200 bg-white mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <p>StaffFlow Operations Board • Press <kbd class="px-1.5 py-0.5 text-[10px] font-mono bg-slate-100 border border-slate-200 rounded text-slate-700">/</kbd> to search, drag cards across columns, or click any note/price inline.</p>
+      <div id="footer-actions" class="flex items-center gap-4">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- SLIDE-OVER QUICK-INSPECT DRAWER                                       -->
+  <!-- ===================================================================== -->
+  <div id="inspect-drawer-backdrop" onclick="closeInspectDrawer()" class="fixed inset-0 z-40 hidden bg-slate-900/35 backdrop-blur-2xs transition-opacity"></div>
+  <aside id="inspect-drawer" class="fixed top-0 right-0 z-50 h-full w-full max-w-md bg-white border-l border-slate-200 shadow-2xl translate-x-full transition-transform duration-200 flex flex-col">
+    <!-- Populated dynamically when opened -->
+  </aside>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: ADD / EDIT PROJECT DRAWER-MODAL                              -->
+  <!-- ===================================================================== -->
+  <div id="project-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+    <div class="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h2 id="modal-title" class="text-base font-bold text-slate-900">Add New Project</h2>
+          <p class="text-xs text-slate-500">Enter client details, quotation price, and initial status.</p>
+        </div>
+        <button type="button" onclick="closeProjectModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="project-form" onsubmit="saveProjectForm(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+        <input type="hidden" id="form-id" />
+
+        <!-- Project Title -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Project Title *</label>
+          <input type="text" id="form-title" required placeholder="e.g., E-Commerce Web Portal & POS Sync" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900" />
+        </div>
+
+        <!-- Status & Price Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Pipeline Stage *</label>
+            <select id="form-status" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-slate-900">
+              <option value="PROJECTS">PROJECTS (Backlog / Inquiry)</option>
+              <option value="FOR DEMO">FOR DEMO</option>
+              <option value="ONGOING">ONGOING</option>
+              <option value="COMPLETED">COMPLETED</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Quoted Price (<span id="form-currency-label">₱</span>) *</label>
+            <input type="number" id="form-price" required min="0" step="any" placeholder="45000" class="w-full px-3 py-2 text-sm font-mono border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+        </div>
+
+        <!-- Client Name -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Client / Company Name *</label>
+          <input type="text" id="form-client" required placeholder="e.g., Marco Reyes — Reyes Hardware" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900" />
+        </div>
+
+        <!-- Contact Details Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+            <input type="email" id="form-email" placeholder="client@company.com" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Phone / WhatsApp / Messenger</label>
+            <input type="text" id="form-phone" placeholder="+63 917 555 0142 or @handle" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900" />
+          </div>
+        </div>
+
+        <!-- Staff Note -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Staff Note / Scope Details</label>
+          <textarea id="form-note" rows="3" placeholder="Add requirements, demo schedule, payment terms, or blockers..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900"></textarea>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeProjectModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 transition-colors">
+            Save Project
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: DATABASE / SUPABASE CONFIG & JSON IMPORT/EXPORT              -->
+  <!-- ===================================================================== -->
+  <div id="db-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+    <div class="bg-white w-full max-w-xl rounded-2xl border border-slate-200 shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
+            <i data-lucide="database" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-bold text-slate-900">Data Sync & Supabase Hook</h2>
+            <p class="text-xs text-slate-500">Export/Import JSON backups or configure backend endpoint.</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeDbModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-5 max-h-[82vh] overflow-y-auto">
+        <!-- JSON Backup & Restore -->
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">JSON Snapshot (Backup / Transfer)</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Export current projects, import a JSON file, or clear the workspace.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
+              <button type="button" onclick="exportJson()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> Export JSON
+              </button>
+              <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer">
+                <i data-lucide="upload" class="w-3.5 h-3.5"></i> Import
+                <input type="file" accept=".json" onchange="importJson(event)" class="hidden" />
+              </label>
+              <button type="button" onclick="triggerClearAllFromModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear All
+              </button>
+            </div>
+          </div>
+          <div id="db-clear-confirm-bar" class="hidden pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span class="font-medium text-rose-800">Remove all projects and start with a blank workspace?</span>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="confirmClearWorkspace()" class="px-2.5 py-1 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700">Yes, Clear All</button>
+              <button type="button" onclick="cancelClearWorkspace()" class="px-2.5 py-1 rounded-lg font-medium bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Supabase / REST API Connector Placeholder -->
+        <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Supabase / REST Backend Config</h3>
+              <p class="text-xs text-slate-500 mt-0.5">Optional endpoint configuration stored locally in browser.</p>
+            </div>
+            <button type="button" onclick="copySchemaSql()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200">
+              <i data-lucide="copy" class="w-3 h-3"></i> Copy SQL Schema
+            </button>
+          </div>
+          <form onsubmit="saveSupabaseConfig(event)" class="space-y-3">
+            <div>
+              <label for="sb-url" class="block text-xs font-semibold text-slate-700 mb-1">Project / REST Endpoint URL</label>
+              <input type="text" id="sb-url" placeholder="https://your-project.supabase.co" class="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900" />
+            </div>
+            <div>
+              <label for="sb-key" class="block text-xs font-semibold text-slate-700 mb-1">Anon / Public API Key</label>
+              <input type="password" id="sb-key" placeholder="eyJhbGciOi..." class="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900" />
+            </div>
+            <div class="flex justify-end">
+              <button type="submit" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800">
+                Save Endpoint Config
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- JAVASCRIPT APPLICATION LOGIC                                          -->
+  <!-- ===================================================================== -->
+  <script>
+    const STORAGE_KEY = 'staffflow_projects_v1';
+    const CURRENCY_KEY = 'staffflow_currency_v1';
+    const VIEW_KEY = 'staffflow_view_v1';
+    const DENSITY_KEY = 'staffflow_density_v1';
+    const SB_CONFIG_KEY = 'staffflow_supabase_config_v1';
+    const PHP_TO_USD_RATE = 56;
+
+    const STATUS_META = {
+      'PROJECTS': {
+        label: 'PROJECTS',
+        subtitle: 'New Leads & Backlog',
+        badgeBg: 'bg-slate-100 text-slate-800 border-slate-200',
+        dot: 'bg-slate-600',
+        headerAccent: 'border-t-slate-600',
+        countBg: 'bg-slate-200/80 text-slate-800'
+      },
+      'FOR DEMO': {
+        label: 'FOR DEMO',
+        subtitle: 'Scheduled & Pending Demo',
+        badgeBg: 'bg-amber-50 text-amber-800 border-amber-200',
+        dot: 'bg-amber-500',
+        headerAccent: 'border-t-amber-500',
+        countBg: 'bg-amber-100 text-amber-800'
+      },
+      'ONGOING': {
+        label: 'ONGOING',
+        subtitle: 'Active Build & Revisions',
+        badgeBg: 'bg-sky-50 text-sky-800 border-sky-200',
+        dot: 'bg-sky-600',
+        headerAccent: 'border-t-sky-600',
+        countBg: 'bg-sky-100 text-sky-800'
+      },
+      'COMPLETED': {
+        label: 'COMPLETED',
+        subtitle: 'Delivered & Closed',
+        badgeBg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+        dot: 'bg-emerald-600',
+        headerAccent: 'border-t-emerald-600',
+        countBg: 'bg-emerald-100 text-emerald-800'
+      }
+    };
+
+    // --- APPLICATION STATE ---
+    let state = {
+      projects: [],
+      activeTab: 'ALL', // 'ALL' | 'PROJECTS' | 'FOR DEMO' | 'ONGOING' | 'COMPLETED'
+      viewMode: 'board', // 'board' | 'list'
+      cardDensity: 'detailed', // 'compact' | 'detailed'
+      quickFilter: 'ALL', // 'ALL' | 'HAS_NOTE' | 'NEEDS_DEMO_FOLLOWUP' | 'HIGH_VALUE'
+      searchQuery: '',
+      sortBy: 'updated',
+      currency: 'PHP', // 'PHP' (₱) | 'USD' ($)
+      editingNoteId: null,
+      editingPriceId: null,
+      confirmDeleteId: null,
+      confirmClearWorkspace: false,
+      inspectingProjectId: null,
+      draggedProjectId: null
+    };
+
+    // --- INITIALIZATION ---
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPreferences();
+      loadProjects();
+      renderAll();
+      bindGlobalShortcuts();
+    });
+
+    function loadPreferences() {
+      try {
+        const savedCurr = localStorage.getItem(CURRENCY_KEY);
+        if (savedCurr === 'PHP' || savedCurr === 'USD') {
+          state.currency = savedCurr;
+        }
+        const savedView = localStorage.getItem(VIEW_KEY);
+        if (savedView === 'board' || savedView === 'list') {
+          state.viewMode = savedView;
+        }
+        const savedDensity = localStorage.getItem(DENSITY_KEY);
+        if (savedDensity === 'compact' || savedDensity === 'detailed') {
+          state.cardDensity = savedDensity;
+        }
+      } catch (e) {
+        console.warn('Preference load warning:', e);
+      }
+    }
+
+    function loadProjects() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw !== null) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            state.projects = parsed;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to parse localStorage projects:', e);
+      }
+      // Start with an empty, real-ready workspace (no mockup projects)
+      state.projects = [];
+      persistProjects();
+    }
+
+    function persistProjects() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.projects));
+      } catch (e) {
+        showToast('Warning: Could not save to browser storage.', 'error');
+      }
+    }
+
+    function bindGlobalShortcuts() {
+      document.addEventListener('keydown', (e) => {
+        const activeTag = document.activeElement ? document.activeElement.tagName : '';
+        const isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag);
+
+        if (e.key === '/' && !isTyping) {
+          e.preventDefault();
+          const input = document.getElementById('search-input');
+          if (input) input.focus();
+        } else if (e.key === 'Escape') {
+          if (state.inspectingProjectId) {
+            closeInspectDrawer();
+            return;
+          }
+          closeProjectModal();
+          closeDbModal();
+          if (state.editingNoteId || state.editingPriceId) {
+            state.editingNoteId = null;
+            state.editingPriceId = null;
+            renderAll();
+          }
+        }
+      });
+    }
+
+    // --- CURRENCY, VIEW, DENSITY & FILTER HANDLERS ---
+    function setCurrency(curr) {
+      if (curr !== 'PHP' && curr !== 'USD') return;
+      state.currency = curr;
+      try {
+        localStorage.setItem(CURRENCY_KEY, curr);
+      } catch (e) {}
+      renderAll();
+      showToast(`Display currency switched to ${curr === 'PHP' ? '₱ PHP' : '$ USD'}`);
+    }
+
+    function formatMoney(amount) {
+      const num = Number(amount) || 0;
+      const converted = state.currency === 'USD' ? num / PHP_TO_USD_RATE : num;
+      const symbol = state.currency === 'PHP' ? '₱' : '$';
+      return symbol + converted.toLocaleString('en-US', {
+        minimumFractionDigits: state.currency === 'USD' && converted % 1 !== 0 ? 2 : 0,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function setViewMode(mode) {
+      if (mode !== 'board' && mode !== 'list') return;
+      state.viewMode = mode;
+      try {
+        localStorage.setItem(VIEW_KEY, mode);
+      } catch (e) {}
+      renderAll();
+    }
+
+    function setCardDensity(density) {
+      if (density !== 'compact' && density !== 'detailed') return;
+      state.cardDensity = density;
+      try {
+        localStorage.setItem(DENSITY_KEY, density);
+      } catch (e) {}
+      renderAll();
+    }
+
+    function setActiveTab(tab) {
+      state.activeTab = tab;
+      renderAll();
+    }
+
+    function setQuickFilter(filterKey) {
+      state.quickFilter = state.quickFilter === filterKey ? 'ALL' : filterKey;
+      renderAll();
+    }
+
+    function handleSearch(val) {
+      state.searchQuery = val || '';
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (clearBtn) {
+        clearBtn.classList.toggle('hidden', !state.searchQuery.trim());
+      }
+      renderProjects();
+    }
+
+    function clearSearch() {
+      const input = document.getElementById('search-input');
+      if (input) input.value = '';
+      state.searchQuery = '';
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (clearBtn) clearBtn.classList.add('hidden');
+      renderProjects();
+    }
+
+    function handleSort(sortVal) {
+      state.sortBy = sortVal || 'updated';
+      renderProjects();
+    }
+
+    function hasActiveFilters() {
+      return (
+        state.activeTab !== 'ALL' ||
+        state.quickFilter !== 'ALL' ||
+        state.searchQuery.trim() !== ''
+      );
+    }
+
+    function clearAllFilters() {
+      state.activeTab = 'ALL';
+      state.quickFilter = 'ALL';
+      state.searchQuery = '';
+      const input = document.getElementById('search-input');
+      if (input) input.value = '';
+      const clearBtn = document.getElementById('clear-search-btn');
+      if (clearBtn) clearBtn.classList.add('hidden');
+      renderAll();
+    }
+
+    function getFilteredProjects() {
+      const q = state.searchQuery.trim().toLowerCase();
+      const highValueThreshold = state.currency === 'USD' ? 1000 : 50000;
+
+      let list = state.projects.filter((p) => {
+        if (state.activeTab !== 'ALL' && p.status !== state.activeTab) {
+          return false;
+        }
+        if (state.quickFilter === 'HAS_NOTE' && !(p.note && p.note.trim())) {
+          return false;
+        }
+        if (state.quickFilter === 'NEEDS_DEMO_FOLLOWUP' && p.status !== 'FOR DEMO') {
+          return false;
+        }
+        if (state.quickFilter === 'HIGH_VALUE' && (Number(p.price) || 0) < highValueThreshold) {
+          return false;
+        }
+        if (q) {
+          const haystack = [
+            p.title,
+            p.clientName,
+            p.email,
+            p.phone,
+            p.note,
+            p.status
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          if (!haystack.includes(q)) return false;
+        }
+        return true;
+      });
+
+      list.sort((a, b) => {
+        switch (state.sortBy) {
+          case 'price-desc':
+            return (Number(b.price) || 0) - (Number(a.price) || 0);
+          case 'price-asc':
+            return (Number(a.price) || 0) - (Number(b.price) || 0);
+          case 'client-asc':
+            return (a.clientName || '').localeCompare(b.clientName || '');
+          case 'note-recent':
+            return new Date(b.noteUpdatedAt || b.updatedAt || 0) - new Date(a.noteUpdatedAt || a.updatedAt || 0);
+          case 'updated':
+          default:
+            return new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0);
+        }
+      });
+
+      return list;
+    }
+
+    // --- RENDERING ENGINE ---
+    function renderAll() {
+      updateControlsUI();
+      renderKPIs();
+      renderTabs();
+      renderQuickFilters();
+      renderProjects();
+      renderFooterActions();
+      if (state.inspectingProjectId) {
+        renderInspectDrawer();
+      }
+      lucide.createIcons();
+    }
+
+    function updateControlsUI() {
+      const phpBtn = document.getElementById('curr-php');
+      const usdBtn = document.getElementById('curr-usd');
+      if (phpBtn && usdBtn) {
+        phpBtn.className = `px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+          state.currency === 'PHP' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+        }`;
+        usdBtn.className = `px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+          state.currency === 'USD' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+        }`;
+      }
+
+      const compactBtn = document.getElementById('density-compact-btn');
+      const detailedBtn = document.getElementById('density-detailed-btn');
+      if (compactBtn && detailedBtn) {
+        compactBtn.className = `inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+          state.cardDensity === 'compact' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+        }`;
+        detailedBtn.className = `inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-all ${
+          state.cardDensity === 'detailed' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+        }`;
+      }
+
+      const boardBtn = document.getElementById('view-board-btn');
+      const listBtn = document.getElementById('view-list-btn');
+      if (boardBtn && listBtn) {
+        boardBtn.className = `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+          state.viewMode === 'board' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+        }`;
+        listBtn.className = `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+          state.viewMode === 'list' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+        }`;
+      }
+    }
+
+    function renderKPIs() {
+      const grid = document.getElementById('kpi-grid');
+      if (!grid) return;
+
+      const totalCount = state.projects.length;
+      const activePipelineValue = state.projects
+        .filter((p) => p.status !== 'COMPLETED')
+        .reduce((acc, p) => acc + (Number(p.price) || 0), 0);
+      const ongoingCount = state.projects.filter((p) => p.status === 'ONGOING').length;
+      const completedRevenue = state.projects
+        .filter((p) => p.status === 'COMPLETED')
+        .reduce((acc, p) => acc + (Number(p.price) || 0), 0);
+
+      const cards = [
+        {
+          label: 'Total Projects',
+          value: String(totalCount),
+          sub: 'All pipeline stages',
+          icon: 'folder-kanban',
+          iconBg: 'bg-slate-100 text-slate-700'
+        },
+        {
+          label: 'Active Pipeline Value',
+          value: formatMoney(activePipelineValue),
+          sub: 'Projects, Demo & Ongoing',
+          icon: 'trending-up',
+          iconBg: 'bg-indigo-50 text-indigo-700'
+        },
+        {
+          label: 'Ongoing Builds',
+          value: String(ongoingCount),
+          sub: 'In active development',
+          icon: 'cpu',
+          iconBg: 'bg-sky-50 text-sky-700'
+        },
+        {
+          label: 'Completed Revenue',
+          value: formatMoney(completedRevenue),
+          sub: 'Delivered & closed',
+          icon: 'check-circle-2',
+          iconBg: 'bg-emerald-50 text-emerald-700'
+        }
+      ];
+
+      grid.innerHTML = cards
+        .map(
+          (c) => `
+          <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-2xs flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-medium text-slate-500">${escapeHtml(c.label)}</p>
+              <p class="text-xl sm:text-2xl font-bold text-slate-900 tabular-nums mt-1">${escapeHtml(c.value)}</p>
+              <p class="text-[11px] text-slate-400 mt-1">${escapeHtml(c.sub)}</p>
+            </div>
+            <div class="w-9 h-9 rounded-lg ${c.iconBg} flex items-center justify-center shrink-0">
+              <i data-lucide="${c.icon}" class="w-4 h-4"></i>
+            </div>
+          </div>
+        `
+        )
+        .join('');
+    }
+
+    function renderTabs() {
+      const tabsEl = document.getElementById('status-tabs');
+      if (!tabsEl) return;
+
+      const stageOrder = ['ALL', 'PROJECTS', 'FOR DEMO', 'ONGOING', 'COMPLETED'];
+
+      tabsEl.innerHTML = stageOrder
+        .map((key) => {
+          const isActive = state.activeTab === key;
+          const items = key === 'ALL' ? state.projects : state.projects.filter((p) => p.status === key);
+          const count = items.length;
+          const subtotal = items.reduce((sum, p) => sum + (Number(p.price) || 0), 0);
+          const label = key === 'ALL' ? 'All Stages' : STATUS_META[key].label;
+          const dotClass = key === 'ALL' ? 'bg-slate-700' : STATUS_META[key].dot;
+
+          return `
+            <button
+              type="button"
+              onclick="setActiveTab('${key}')"
+              class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all ${
+                isActive
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+              }"
+            >
+              <span class="w-2 h-2 rounded-full ${isActive ? 'bg-white' : dotClass}"></span>
+              <span>${escapeHtml(label)}</span>
+              <span class="px-1.5 py-0.5 rounded-md text-[11px] font-mono tabular-nums ${
+                isActive ? 'bg-white/15 text-white' : 'bg-white text-slate-700 border border-slate-200'
+              }">${count}</span>
+              <span class="hidden sm:inline text-[11px] font-mono tabular-nums ${
+                isActive ? 'text-slate-300' : 'text-slate-500'
+              }">${formatMoney(subtotal)}</span>
+            </button>
+          `;
+        })
+        .join('');
+    }
+
+    function renderQuickFilters() {
+      const bar = document.getElementById('quick-filters-bar');
+      if (!bar) return;
+
+      const highValLabel = state.currency === 'USD' ? 'High Value ($1k+)' : 'High Value (₱50k+)';
+      const chips = [
+        { id: 'HAS_NOTE', label: 'Has Note', icon: 'file-text' },
+        { id: 'NEEDS_DEMO_FOLLOWUP', label: 'Demo Follow-up', icon: 'presentation' },
+        { id: 'HIGH_VALUE', label: highValLabel, icon: 'sparkles' }
+      ];
+
+      const chipHtml = chips
+        .map((chip) => {
+          const active = state.quickFilter === chip.id;
+          return `
+            <button
+              type="button"
+              onclick="setQuickFilter('${chip.id}')"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                active
+                  ? 'bg-indigo-50 text-indigo-800 border-indigo-300'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }"
+            >
+              <i data-lucide="${chip.icon}" class="w-3.5 h-3.5"></i>
+              <span>${escapeHtml(chip.label)}</span>
+            </button>
+          `;
+        })
+        .join('');
+
+      const resetHtml = hasActiveFilters()
+        ? `<button type="button" onclick="clearAllFilters()" class="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-800">
+             <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset Filters
+           </button>`
+        : `<span class="text-[11px] text-slate-400">Showing ${getFilteredProjects().length} of ${state.projects.length} project(s)</span>`;
+
+      bar.innerHTML = `
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mr-1">Quick Filters:</span>
+          ${chipHtml}
+        </div>
+        <div>${resetHtml}</div>
+      `;
+    }
+
+    function renderFooterActions() {
+      const container = document.getElementById('footer-actions');
+      if (!container) return;
+
+      if (state.projects.length === 0) {
+        container.innerHTML = `<span class="text-slate-400">Blank workspace ready</span>`;
+        return;
+      }
+
+      if (state.confirmClearWorkspace) {
+        container.innerHTML = `
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-rose-700 font-medium">Clear all ${state.projects.length} project(s)?</span>
+            <button type="button" onclick="confirmClearWorkspace()" class="px-2 py-0.5 rounded bg-rose-600 text-white font-semibold hover:bg-rose-700">Yes, Clear All</button>
+            <button type="button" onclick="cancelClearWorkspace()" class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium hover:bg-slate-200">Cancel</button>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <button type="button" onclick="requestClearWorkspace()" class="hover:text-rose-700 underline underline-offset-2">Load Blank / Clear All</button>
+        `;
+      }
+    }
+
+    function renderProjects() {
+      const container = document.getElementById('projects-container');
+      const filtered = getFilteredProjects();
+
+      if (filtered.length === 0) {
+        const isWorkspaceEmpty = state.projects.length === 0;
+        const defaultStage = state.activeTab !== 'ALL' ? state.activeTab : 'PROJECTS';
+
+        if (isWorkspaceEmpty) {
+          container.innerHTML = `
+            <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-10 sm:p-14 text-center max-w-xl mx-auto my-6 shadow-2xs">
+              <div class="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center mx-auto mb-4 shadow-xs">
+                <i data-lucide="folder-plus" class="w-6 h-6"></i>
+              </div>
+              <h3 class="text-base font-bold text-slate-900">Your StaffFlow pipeline is blank</h3>
+              <p class="text-xs sm:text-sm text-slate-500 mt-1.5 leading-relaxed">
+                No sample or placeholder records are loaded. Create your first real project entry, import a JSON snapshot, or connect a backend.
+              </p>
+              <div class="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+                <button
+                  type="button"
+                  onclick="openProjectModal('${defaultStage}')"
+                  class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900 text-white hover:bg-slate-800 shadow-sm transition-all"
+                >
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                  <span>+ New Project</span>
+                </button>
+                <button
+                  type="button"
+                  onclick="openDbModal()"
+                  class="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  <i data-lucide="database" class="w-4 h-4 text-slate-500"></i>
+                  <span>Import JSON / DB</span>
+                </button>
+              </div>
+              <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col items-center gap-2">
+                ${state.confirmClearWorkspace ? `
+                  <div class="flex flex-wrap items-center justify-center gap-2 text-xs">
+                    <span class="font-medium text-rose-700">Workspace is already blank. Confirm reset?</span>
+                    <button type="button" onclick="confirmClearWorkspace()" class="px-2.5 py-1 rounded-lg font-semibold bg-rose-600 text-white hover:bg-rose-700">Confirm Blank</button>
+                    <button type="button" onclick="cancelClearWorkspace()" class="px-2.5 py-1 rounded-lg font-medium bg-slate-100 text-slate-700 hover:bg-slate-200">Cancel</button>
+                  </div>
+                ` : `
+                  <button
+                    type="button"
+                    onclick="requestClearWorkspace()"
+                    class="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors"
+                  >
+                    <i data-lucide="eraser" class="w-3.5 h-3.5"></i>
+                    <span>Load Blank / Clear All</span>
+                  </button>
+                `}
+              </div>
+            </div>
+          `;
+        } else {
+          container.innerHTML = `
+            <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center max-w-lg mx-auto my-8">
+              <div class="w-12 h-12 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center mx-auto mb-3">
+                <i data-lucide="inbox" class="w-6 h-6"></i>
+              </div>
+              <h3 class="text-sm font-bold text-slate-900">No matching projects found</h3>
+              <p class="text-xs text-slate-500 mt-1">Try adjusting your filters, clearing search, or adding a new project.</p>
+              <div class="mt-4 flex items-center justify-center gap-2">
+                ${hasActiveFilters() ? `<button onclick="clearAllFilters()" class="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 hover:bg-slate-50">Clear Filters</button>` : ''}
+                <button onclick="openProjectModal('${defaultStage}')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800">
+                  + New Project
+                </button>
+              </div>
+            </div>
+          `;
+        }
+        return;
+      }
+
+      if (state.viewMode === 'list') {
+        renderListView(container, filtered);
+      } else {
+        renderBoardView(container, filtered);
+      }
+    }
+
+    function renderBoardView(container, filtered) {
+      if (state.activeTab === 'ALL') {
+        const stages = ['PROJECTS', 'FOR DEMO', 'ONGOING', 'COMPLETED'];
+        container.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+            ${stages
+              .map((stage) => {
+                const meta = STATUS_META[stage];
+                const colItems = filtered.filter((p) => p.status === stage);
+                const colTotal = colItems.reduce((s, p) => s + (Number(p.price) || 0), 0);
+
+                return `
+                  <div
+                    data-stage="${stage}"
+                    ondragover="handleColumnDragOver(event)"
+                    ondragleave="handleColumnDragLeave(event)"
+                    ondrop="handleColumnDrop(event, '${stage}')"
+                    class="bg-slate-100/75 rounded-2xl border border-slate-200/90 border-t-4 ${meta.headerAccent} p-3 space-y-3 transition-colors"
+                  >
+                    <div class="flex items-center justify-between gap-2 px-1">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-2 h-2 rounded-full ${meta.dot} shrink-0"></span>
+                        <h2 class="text-xs font-bold tracking-wider uppercase text-slate-800 truncate">${escapeHtml(meta.label)}</h2>
+                        <span class="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold ${meta.countBg}">${colItems.length}</span>
+                      </div>
+                      <span class="text-xs font-mono font-semibold text-slate-600 tabular-nums shrink-0">${formatMoney(colTotal)}</span>
+                    </div>
+
+                    <div class="space-y-3 min-h-[120px]">
+                      ${
+                        colItems.length > 0
+                          ? colItems.map((p) => renderProjectCard(p)).join('')
+                          : `<div class="rounded-xl border border-dashed border-slate-300/90 bg-white/60 p-6 text-center text-xs text-slate-400">
+                               No projects in ${escapeHtml(meta.label)}
+                             </div>`
+                      }
+                    </div>
+
+                    <button
+                      type="button"
+                      onclick="openProjectModal('${stage}')"
+                      class="w-full py-2 px-3 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600 hover:bg-white hover:text-slate-900 hover:border-slate-400 flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                      <span>Add to ${escapeHtml(meta.label)}</span>
+                    </button>
+                  </div>
+                `;
+              })
+              .join('')}
+          </div>
+        `;
+      } else {
+        const meta = STATUS_META[state.activeTab];
+        const stageTotal = filtered.reduce((s, p) => s + (Number(p.price) || 0), 0);
+        const gridCols =
+          state.cardDensity === 'compact'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+            : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3';
+
+        container.innerHTML = `
+          <div class="space-y-4">
+            <div class="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full ${meta.dot}"></span>
+                <h2 class="text-sm font-bold text-slate-900">${escapeHtml(meta.label)}</h2>
+                <span class="text-xs text-slate-500">— ${escapeHtml(meta.subtitle)}</span>
+              </div>
+              <div class="flex items-center gap-3 text-xs">
+                <span class="font-mono text-slate-600">${filtered.length} item(s)</span>
+                <span class="font-mono font-bold text-slate-900 tabular-nums">${formatMoney(stageTotal)}</span>
+              </div>
+            </div>
+
+            <div class="grid ${gridCols} gap-4 items-start">
+              ${filtered.map((p) => renderProjectCard(p)).join('')}
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function renderProjectCard(project) {
+      const meta = STATUS_META[project.status] || STATUS_META.PROJECTS;
+      const isCompact = state.cardDensity === 'compact';
+      const isEditingNote = state.editingNoteId === project.id;
+      const isEditingPrice = state.editingPriceId === project.id;
+      const isConfirmingDelete = state.confirmDeleteId === project.id;
+      const nextStage = getNextStage(project.status);
+
+      const priceHtml = isEditingPrice
+        ? `<div class="inline-flex items-center gap-1" onclick="event.stopPropagation()">
+             <input
+               type="number"
+               id="price-input-${project.id}"
+               value="${escapeAttr(project.price)}"
+               min="0"
+               step="any"
+               onkeydown="handleInlinePriceKey(event, '${project.id}')"
+               class="w-28 px-2 py-1 text-xs font-mono font-semibold border border-slate-900 rounded-md bg-white focus:outline-none"
+             />
+             <button type="button" onclick="saveInlinePrice('${project.id}')" class="px-2 py-1 rounded-md text-[11px] font-semibold bg-slate-900 text-white hover:bg-slate-800">Save</button>
+             <button type="button" onclick="cancelInlineEdit()" class="px-1.5 py-1 rounded-md text-[11px] text-slate-500 hover:bg-slate-100">✕</button>
+           </div>`
+        : `<button
+             type="button"
+             onclick="startEditPrice('${project.id}')"
+             title="Click to edit price inline"
+             class="group/price inline-flex items-center gap-1 text-sm font-bold font-mono text-slate-900 tabular-nums hover:text-indigo-700 transition-colors"
+           >
+             <span>${formatMoney(project.price)}</span>
+             <i data-lucide="pencil" class="w-3 h-3 text-slate-400 opacity-70 group-hover/price:opacity-100"></i>
+           </button>`;
+
+      const noteBody = isEditingNote
+        ? `<div class="space-y-2" onclick="event.stopPropagation()">
+             <textarea
+               id="note-input-${project.id}"
+               rows="3"
+               onkeydown="handleInlineNoteKey(event, '${project.id}')"
+               placeholder="Write staff note, next steps, or client feedback..."
+               class="w-full p-2 text-xs border border-slate-900 rounded-lg bg-slate-50 focus:bg-white focus:outline-none"
+             >${escapeHtml(project.note || '')}</textarea>
+             <div class="flex items-center justify-between gap-2">
+               <span class="text-[10px] text-slate-400">Ctrl+Enter to save</span>
+               <div class="flex items-center gap-1.5">
+                 <button type="button" onclick="cancelInlineEdit()" class="px-2 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:bg-slate-100">Cancel</button>
+                 <button type="button" onclick="saveInlineNote('${project.id}')" class="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-900 text-white hover:bg-slate-800">Save Note</button>
+               </div>
+             </div>
+           </div>`
+        : `<div
+             onclick="startEditNote('${project.id}')"
+             title="Click to edit staff note inline"
+             class="group/note cursor-pointer rounded-lg p-2 -mx-1 bg-slate-50/80 hover:bg-amber-50/60 border border-transparent hover:border-amber-200/80 transition-colors"
+           >
+             <div class="flex items-center justify-between gap-2 mb-1">
+               <span class="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                 <i data-lucide="sticky-note" class="w-3 h-3 text-amber-600"></i>
+                 Staff Note
+               </span>
+               <span class="text-[10px] text-slate-400 opacity-0 group-hover/note:opacity-100 transition-opacity">Edit</span>
+             </div>
+             ${
+               project.note && project.note.trim()
+                 ? `<p class="text-xs text-slate-700 leading-relaxed ${isCompact ? 'line-clamp-1' : 'line-clamp-3'}">${escapeHtml(project.note)}</p>`
+                 : `<p class="text-xs italic text-slate-400">No note yet — click to add note...</p>`
+             }
+           </div>`;
+
+      const contactHtml = isCompact
+        ? `<div class="flex items-center justify-between gap-2 text-xs text-slate-600 pt-1">
+             <span class="truncate font-medium text-slate-700">${escapeHtml(project.clientName)}</span>
+             <div class="flex items-center gap-1 shrink-0">
+               ${
+                 project.email
+                   ? `<a href="mailto:${escapeAttr(project.email)}" onclick="event.stopPropagation()" title="Email ${escapeAttr(project.email)}" class="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900"><i data-lucide="mail" class="w-3.5 h-3.5"></i></a>
+                      <button type="button" onclick="copyText('${escapeJs(project.email)}', 'Email copied')" title="Copy email" class="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>`
+                   : ''
+               }
+               ${
+                 project.phone
+                   ? `<button type="button" onclick="copyText('${escapeJs(project.phone)}', 'Contact copied')" title="${escapeAttr(project.phone)}" class="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-900"><i data-lucide="phone" class="w-3.5 h-3.5"></i></button>`
+                   : ''
+               }
+             </div>
+           </div>`
+        : `<div class="space-y-1.5 pt-2 border-t border-slate-100 text-xs">
+             <div class="flex items-center gap-2 text-slate-800 font-medium">
+               <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+               <span class="truncate">${escapeHtml(project.clientName)}</span>
+             </div>
+             ${
+               project.email
+                 ? `<div class="flex items-center justify-between gap-2 text-slate-600">
+                      <a href="mailto:${escapeAttr(project.email)}" class="inline-flex items-center gap-1.5 truncate hover:text-indigo-700">
+                        <i data-lucide="mail" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+                        <span class="truncate">${escapeHtml(project.email)}</span>
+                      </a>
+                      <button type="button" onclick="copyText('${escapeJs(project.email)}', 'Email copied')" title="Copy email" class="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 shrink-0">
+                        <i data-lucide="copy" class="w-3 h-3"></i>
+                      </button>
+                    </div>`
+                 : ''
+             }
+             ${
+               project.phone
+                 ? `<div class="flex items-center justify-between gap-2 text-slate-600">
+                      <span class="inline-flex items-center gap-1.5 truncate">
+                        <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+                        <span class="truncate font-mono text-[11px]">${escapeHtml(project.phone)}</span>
+                      </span>
+                      <button type="button" onclick="copyText('${escapeJs(project.phone)}', 'Phone / handle copied')" title="Copy phone or handle" class="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-700 shrink-0">
+                        <i data-lucide="copy" class="w-3 h-3"></i>
+                      </button>
+                    </div>`
+                 : ''
+             }
+           </div>`;
+
+      return `
+        <article
+          draggable="true"
+          ondragstart="handleCardDragStart(event, '${project.id}')"
+          ondragend="handleCardDragEnd(event)"
+          class="bg-white rounded-xl border border-slate-200 ${isCompact ? 'p-3.5 space-y-2.5' : 'p-4 space-y-3'} shadow-2xs hover:border-slate-300 hover:shadow-sm transition-all"
+        >
+          <!-- Top Row: Stage Badge + Quick Actions -->
+          <div class="flex items-center justify-between gap-2">
+            <select
+              aria-label="Change pipeline stage"
+              onchange="updateProjectStatus('${project.id}', this.value)"
+              class="px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide border cursor-pointer focus:outline-none ${meta.badgeBg}"
+            >
+              <option value="PROJECTS" ${project.status === 'PROJECTS' ? 'selected' : ''}>PROJECTS</option>
+              <option value="FOR DEMO" ${project.status === 'FOR DEMO' ? 'selected' : ''}>FOR DEMO</option>
+              <option value="ONGOING" ${project.status === 'ONGOING' ? 'selected' : ''}>ONGOING</option>
+              <option value="COMPLETED" ${project.status === 'COMPLETED' ? 'selected' : ''}>COMPLETED</option>
+            </select>
+
+            <div class="flex items-center gap-1">
+              ${
+                nextStage
+                  ? `<button
+                       type="button"
+                       onclick="updateProjectStatus('${project.id}', '${nextStage}')"
+                       title="Advance to ${escapeAttr(nextStage)}"
+                       class="p-1 rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 transition-colors"
+                     >
+                       <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                     </button>`
+                  : ''
+              }
+              <button
+                type="button"
+                onclick="openInspectDrawer('${project.id}')"
+                title="Quick inspect & full edit"
+                class="p-1 rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              >
+                <i data-lucide="panel-right-open" class="w-3.5 h-3.5"></i>
+              </button>
+              <button
+                type="button"
+                onclick="openProjectModal(null, '${project.id}')"
+                title="Edit project modal"
+                class="p-1 rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              >
+                <i data-lucide="square-pen" class="w-3.5 h-3.5"></i>
+              </button>
+              <button
+                type="button"
+                onclick="requestDeleteProject('${project.id}')"
+                title="Delete project"
+                class="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
+          ${
+            isConfirmingDelete
+              ? `<div class="p-2.5 rounded-lg bg-rose-50 border border-rose-200 flex items-center justify-between gap-2 text-xs">
+                   <span class="font-medium text-rose-800">Delete this project?</span>
+                   <div class="flex items-center gap-1.5 shrink-0">
+                     <button type="button" onclick="confirmDeleteProject('${project.id}')" class="px-2 py-0.5 rounded bg-rose-600 text-white font-semibold hover:bg-rose-700">Delete</button>
+                     <button type="button" onclick="cancelDeleteProject()" class="px-2 py-0.5 rounded bg-white border border-rose-200 text-slate-700 hover:bg-slate-50">Cancel</button>
+                   </div>
+                 </div>`
+              : ''
+          }
+
+          <!-- Title & Price -->
+          <div class="flex items-start justify-between gap-2">
+            <button
+              type="button"
+              onclick="openInspectDrawer('${project.id}')"
+              class="text-left text-sm font-bold text-slate-900 hover:text-indigo-700 leading-snug transition-colors"
+            >
+              ${escapeHtml(project.title)}
+            </button>
+            <div class="shrink-0">${priceHtml}</div>
+          </div>
+
+          <!-- Contact Information -->
+          ${contactHtml}
+
+          <!-- Editable Staff Note -->
+          ${noteBody}
+
+          <!-- Footer Timestamp -->
+          <div class="pt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Updated ${formatRelativeTime(project.updatedAt)}</span>
+            ${project.noteUpdatedAt ? `<span>Note ${formatRelativeTime(project.noteUpdatedAt)}</span>` : ''}
+          </div>
+        </article>
+      `;
+    }
+
+    function renderListView(container, filtered) {
+      container.innerHTML = `
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <th class="py-3 px-4">Project</th>
+                  <th class="py-3 px-4">Stage</th>
+                  <th class="py-3 px-4">Price</th>
+                  <th class="py-3 px-4">Client & Contact</th>
+                  <th class="py-3 px-4">Staff Note</th>
+                  <th class="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-xs">
+                ${filtered
+                  .map((p) => {
+                    const meta = STATUS_META[p.status] || STATUS_META.PROJECTS;
+                    const isEditingNote = state.editingNoteId === p.id;
+                    const isEditingPrice = state.editingPriceId === p.id;
+
+                    return `
+                      <tr class="hover:bg-slate-50/70 align-top transition-colors">
+                        <td class="py-3.5 px-4 min-w-[180px]">
+                          <button type="button" onclick="openInspectDrawer('${p.id}')" class="font-bold text-slate-900 hover:text-indigo-700 text-left block">
+                            ${escapeHtml(p.title)}
+                          </button>
+                          <span class="text-[11px] text-slate-400">Updated ${formatRelativeTime(p.updatedAt)}</span>
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                          <select
+                            onchange="updateProjectStatus('${p.id}', this.value)"
+                            class="px-2 py-1 rounded-full text-[11px] font-bold border cursor-pointer focus:outline-none ${meta.badgeBg}"
+                          >
+                            <option value="PROJECTS" ${p.status === 'PROJECTS' ? 'selected' : ''}>PROJECTS</option>
+                            <option value="FOR DEMO" ${p.status === 'FOR DEMO' ? 'selected' : ''}>FOR DEMO</option>
+                            <option value="ONGOING" ${p.status === 'ONGOING' ? 'selected' : ''}>ONGOING</option>
+                            <option value="COMPLETED" ${p.status === 'COMPLETED' ? 'selected' : ''}>COMPLETED</option>
+                          </select>
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap font-mono">
+                          ${
+                            isEditingPrice
+                              ? `<div class="inline-flex items-center gap-1">
+                                   <input type="number" id="price-input-${p.id}" value="${escapeAttr(p.price)}" min="0" step="any" onkeydown="handleInlinePriceKey(event, '${p.id}')" class="w-24 px-2 py-1 text-xs border border-slate-900 rounded bg-white" />
+                                   <button type="button" onclick="saveInlinePrice('${p.id}')" class="px-2 py-1 rounded bg-slate-900 text-white text-[11px] font-semibold">Save</button>
+                                 </div>`
+                              : `<button type="button" onclick="startEditPrice('${p.id}')" class="font-bold text-slate-900 hover:text-indigo-700 tabular-nums">${formatMoney(p.price)}</button>`
+                          }
+                        </td>
+                        <td class="py-3.5 px-4 min-w-[200px] space-y-1">
+                          <div class="font-semibold text-slate-800">${escapeHtml(p.clientName)}</div>
+                          ${
+                            p.email
+                              ? `<div class="flex items-center gap-1.5 text-slate-600">
+                                   <a href="mailto:${escapeAttr(p.email)}" class="hover:text-indigo-700 truncate max-w-[180px]">${escapeHtml(p.email)}</a>
+                                   <button type="button" onclick="copyText('${escapeJs(p.email)}', 'Email copied')" class="text-slate-400 hover:text-slate-700"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                                 </div>`
+                              : ''
+                          }
+                          ${
+                            p.phone
+                              ? `<div class="flex items-center gap-1.5 text-slate-500 font-mono text-[11px]">
+                                   <span>${escapeHtml(p.phone)}</span>
+                                   <button type="button" onclick="copyText('${escapeJs(p.phone)}', 'Contact copied')" class="text-slate-400 hover:text-slate-700"><i data-lucide="copy" class="w-3 h-3"></i></button>
+                                 </div>`
+                              : ''
+                          }
+                        </td>
+                        <td class="py-3.5 px-4 min-w-[220px] max-w-xs">
+                          ${
+                            isEditingNote
+                              ? `<div class="space-y-1.5">
+                                   <textarea id="note-input-${p.id}" rows="2" onkeydown="handleInlineNoteKey(event, '${p.id}')" class="w-full p-2 text-xs border border-slate-900 rounded-lg bg-slate-50 focus:bg-white focus:outline-none">${escapeHtml(p.note || '')}</textarea>
+                                   <div class="flex items-center gap-1.5">
+                                     <button type="button" onclick="saveInlineNote('${p.id}')" class="px-2 py-0.5 rounded bg-slate-900 text-white text-[11px] font-semibold">Save</button>
+                                     <button type="button" onclick="cancelInlineEdit()" class="px-2 py-0.5 rounded text-slate-500 hover:bg-slate-100 text-[11px]">Cancel</button>
+                                   </div>
+                                 </div>`
+                              : `<div onclick="startEditNote('${p.id}')" class="cursor-pointer rounded-lg p-1.5 -m-1 hover:bg-amber-50/70 transition-colors">
+                                   ${
+                                     p.note && p.note.trim()
+                                       ? `<p class="text-slate-700 line-clamp-2">${escapeHtml(p.note)}</p>`
+                                       : `<p class="italic text-slate-400">Click to add note...</p>`
+                                   }
+                                 </div>`
+                          }
+                        </td>
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                          <div class="inline-flex items-center gap-1">
+                            <button type="button" onclick="openInspectDrawer('${p.id}')" title="Inspect" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100">
+                              <i data-lucide="panel-right-open" class="w-4 h-4"></i>
+                            </button>
+                            <button type="button" onclick="openProjectModal(null, '${p.id}')" title="Edit" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100">
+                              <i data-lucide="square-pen" class="w-4 h-4"></i>
+                            </button>
+                            <button type="button" onclick="requestDeleteProject('${p.id}')" title="Delete" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50">
+                              <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                  })
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- DRAG & DROP HANDLERS ---
+    function handleCardDragStart(event, id) {
+      state.draggedProjectId = id;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', id);
+      if (event.currentTarget) {
+        event.currentTarget.classList.add('dragging-card');
+      }
+    }
+
+    function handleCardDragEnd(event) {
+      state.draggedProjectId = null;
+      if (event.currentTarget) {
+        event.currentTarget.classList.remove('dragging-card');
+      }
+      document.querySelectorAll('.drag-over-col').forEach((el) => el.classList.remove('drag-over-col'));
+    }
+
+    function handleColumnDragOver(event) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      const col = event.currentTarget;
+      if (col && !col.classList.contains('drag-over-col')) {
+        col.classList.add('drag-over-col');
+      }
+    }
+
+    function handleColumnDragLeave(event) {
+      const col = event.currentTarget;
+      if (col && !col.contains(event.relatedTarget)) {
+        col.classList.remove('drag-over-col');
+      }
+    }
+
+    function handleColumnDrop(event, targetStage) {
+      event.preventDefault();
+      const col = event.currentTarget;
+      if (col) col.classList.remove('drag-over-col');
+      const id = event.dataTransfer.getData('text/plain') || state.draggedProjectId;
+      if (id && targetStage) {
+        updateProjectStatus(id, targetStage);
+      }
+      state.draggedProjectId = null;
+    }
+
+    // --- PROJECT CRUD & INLINE EDITS ---
+    function openProjectModal(defaultStage = 'PROJECTS', editId = null) {
+      const modal = document.getElementById('project-modal');
+      const titleEl = document.getElementById('modal-title');
+      const currLabel = document.getElementById('form-currency-label');
+      if (currLabel) {
+        currLabel.textContent = state.currency === 'USD' ? '$ (entered in base unit)' : '₱';
+      }
+
+      if (editId) {
+        const proj = state.projects.find((p) => p.id === editId);
+        if (!proj) return;
+        titleEl.textContent = 'Edit Project';
+        document.getElementById('form-id').value = proj.id;
+        document.getElementById('form-title').value = proj.title || '';
+        document.getElementById('form-status').value = proj.status || 'PROJECTS';
+        document.getElementById('form-price').value = proj.price ?? 0;
+        document.getElementById('form-client').value = proj.clientName || '';
+        document.getElementById('form-email').value = proj.email || '';
+        document.getElementById('form-phone').value = proj.phone || '';
+        document.getElementById('form-note').value = proj.note || '';
+      } else {
+        titleEl.textContent = 'Add New Project';
+        document.getElementById('form-id').value = '';
+        document.getElementById('form-title').value = '';
+        document.getElementById('form-status').value = STATUS_META[defaultStage] ? defaultStage : 'PROJECTS';
+        document.getElementById('form-price').value = '';
+        document.getElementById('form-client').value = '';
+        document.getElementById('form-email').value = '';
+        document.getElementById('form-phone').value = '';
+        document.getElementById('form-note').value = '';
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+      setTimeout(() => {
+        const titleInput = document.getElementById('form-title');
+        if (titleInput) titleInput.focus();
+      }, 40);
+    }
+
+    function closeProjectModal() {
+      const modal = document.getElementById('project-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function saveProjectForm(event) {
+      event.preventDefault();
+      const id = document.getElementById('form-id').value.trim();
+      const title = document.getElementById('form-title').value.trim();
+      const status = document.getElementById('form-status').value;
+      const rawPrice = parseFloat(document.getElementById('form-price').value);
+      const price = Number.isFinite(rawPrice) && rawPrice >= 0 ? rawPrice : 0;
+      const clientName = document.getElementById('form-client').value.trim();
+      const email = document.getElementById('form-email').value.trim();
+      const phone = document.getElementById('form-phone').value.trim();
+      const note = document.getElementById('form-note').value;
+
+      if (!title || !clientName) {
+        showToast('Please enter both Project Title and Client Name.', 'error');
+        return;
+      }
+
+      const now = new Date().toISOString();
+
+      if (id) {
+        const idx = state.projects.findIndex((p) => p.id === id);
+        if (idx !== -1) {
+          const prev = state.projects[idx];
+          const noteChanged = (prev.note || '') !== note;
+          state.projects[idx] = {
+            ...prev,
+            title,
+            status,
+            price,
+            clientName,
+            email,
+            phone,
+            note,
+            updatedAt: now,
+            noteUpdatedAt: noteChanged ? now : prev.noteUpdatedAt
+          };
+          showToast(`Updated "${title}"`);
+        }
+      } else {
+        const newProj = {
+          id: 'proj-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          title,
+          status: STATUS_META[status] ? status : 'PROJECTS',
+          price,
+          clientName,
+          email,
+          phone,
+          note,
+          createdAt: now,
+          updatedAt: now,
+          noteUpdatedAt: note && note.trim() ? now : null
+        };
+        state.projects.unshift(newProj);
+        showToast(`Created "${title}" in ${newProj.status}`);
+      }
+
+      persistProjects();
+      closeProjectModal();
+      renderAll();
+    }
+
+    function updateProjectStatus(id, newStatus) {
+      if (!STATUS_META[newStatus]) return;
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj || proj.status === newStatus) return;
+
+      proj.status = newStatus;
+      proj.updatedAt = new Date().toISOString();
+      persistProjects();
+      renderAll();
+      showToast(`Moved "${proj.title}" to ${newStatus}`);
+    }
+
+    function startEditNote(id) {
+      state.editingPriceId = null;
+      state.editingNoteId = id;
+      renderProjects();
+      lucide.createIcons();
+      setTimeout(() => {
+        const el = document.getElementById(`note-input-${id}`);
+        if (el) {
+          el.focus();
+          el.setSelectionRange(el.value.length, el.value.length);
+        }
+      }, 20);
+    }
+
+    function handleInlineNoteKey(event, id) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        saveInlineNote(id);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelInlineEdit();
+      }
+    }
+
+    function saveInlineNote(id) {
+      const el = document.getElementById(`note-input-${id}`);
+      const proj = state.projects.find((p) => p.id === id);
+      if (!el || !proj) return;
+
+      const now = new Date().toISOString();
+      proj.note = el.value;
+      proj.noteUpdatedAt = now;
+      proj.updatedAt = now;
+      state.editingNoteId = null;
+
+      persistProjects();
+      renderAll();
+      showToast('Staff note saved');
+    }
+
+    function startEditPrice(id) {
+      state.editingNoteId = null;
+      state.editingPriceId = id;
+      renderProjects();
+      lucide.createIcons();
+      setTimeout(() => {
+        const el = document.getElementById(`price-input-${id}`);
+        if (el) {
+          el.focus();
+          el.select();
+        }
+      }, 20);
+    }
+
+    function handleInlinePriceKey(event, id) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveInlinePrice(id);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelInlineEdit();
+      }
+    }
+
+    function saveInlinePrice(id) {
+      const el = document.getElementById(`price-input-${id}`);
+      const proj = state.projects.find((p) => p.id === id);
+      if (!el || !proj) return;
+
+      const parsed = parseFloat(el.value);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        showToast('Enter a valid non-negative price.', 'error');
+        return;
+      }
+
+      proj.price = parsed;
+      proj.updatedAt = new Date().toISOString();
+      state.editingPriceId = null;
+
+      persistProjects();
+      renderAll();
+      showToast('Price updated');
+    }
+
+    function cancelInlineEdit() {
+      state.editingNoteId = null;
+      state.editingPriceId = null;
+      renderAll();
+    }
+
+    function requestDeleteProject(id) {
+      state.confirmDeleteId = id;
+      renderProjects();
+      lucide.createIcons();
+    }
+
+    function cancelDeleteProject() {
+      state.confirmDeleteId = null;
+      renderProjects();
+      lucide.createIcons();
+    }
+
+    function confirmDeleteProject(id) {
+      const target = state.projects.find((p) => p.id === id);
+      state.projects = state.projects.filter((p) => p.id !== id);
+      if (state.confirmDeleteId === id) state.confirmDeleteId = null;
+      if (state.inspectingProjectId === id) closeInspectDrawer();
+      persistProjects();
+      renderAll();
+      showToast(target ? `Deleted "${target.title}"` : 'Project deleted');
+    }
+
+    // --- QUICK-INSPECT SLIDE-OVER DRAWER ---
+    function openInspectDrawer(id) {
+      const proj = state.projects.find((p) => p.id === id);
+      if (!proj) return;
+      state.inspectingProjectId = id;
+      renderInspectDrawer();
+
+      const backdrop = document.getElementById('inspect-drawer-backdrop');
+      const drawer = document.getElementById('inspect-drawer');
+      backdrop.classList.remove('hidden');
+      setTimeout(() => {
+        drawer.classList.remove('translate-x-full');
+      }, 10);
+      lucide.createIcons();
+    }
+
+    function closeInspectDrawer() {
+      state.inspectingProjectId = null;
+      const backdrop = document.getElementById('inspect-drawer-backdrop');
+      const drawer = document.getElementById('inspect-drawer');
+      if (drawer) drawer.classList.add('translate-x-full');
+      setTimeout(() => {
+        if (backdrop) backdrop.classList.add('hidden');
+      }, 180);
+    }
+
+    function renderInspectDrawer() {
+      const drawer = document.getElementById('inspect-drawer');
+      if (!drawer || !state.inspectingProjectId) return;
+      const proj = state.projects.find((p) => p.id === state.inspectingProjectId);
+      if (!proj) {
+        closeInspectDrawer();
+        return;
+      }
+
+      const meta = STATUS_META[proj.status] || STATUS_META.PROJECTS;
+
+      drawer.innerHTML = `
+        <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2.5 h-2.5 rounded-full ${meta.dot} shrink-0"></span>
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Project Inspector</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button type="button" onclick="openProjectModal(null, '${proj.id}')" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800">
+              Full Edit
+            </button>
+            <button type="button" onclick="closeInspectDrawer()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5 space-y-5">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900 leading-snug">${escapeHtml(proj.title)}</h2>
+            <p class="text-xs text-slate-400 mt-1">Last updated ${formatRelativeTime(proj.updatedAt)}</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Stage</label>
+              <select onchange="updateProjectStatus('${proj.id}', this.value)" class="w-full px-2 py-1 rounded-lg text-xs font-bold border bg-white ${meta.badgeBg}">
+                <option value="PROJECTS" ${proj.status === 'PROJECTS' ? 'selected' : ''}>PROJECTS</option>
+                <option value="FOR DEMO" ${proj.status === 'FOR DEMO' ? 'selected' : ''}>FOR DEMO</option>
+                <option value="ONGOING" ${proj.status === 'ONGOING' ? 'selected' : ''}>ONGOING</option>
+                <option value="COMPLETED" ${proj.status === 'COMPLETED' ? 'selected' : ''}>COMPLETED</option>
+              </select>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+              <label class="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Quoted Price</label>
+              <p class="text-base font-bold font-mono text-slate-900 tabular-nums py-0.5">${formatMoney(proj.price)}</p>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-xl border border-slate-200 space-y-2.5">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Client & Contact</h3>
+            <p class="text-sm font-semibold text-slate-900">${escapeHtml(proj.clientName)}</p>
+            ${
+              proj.email
+                ? `<div class="flex items-center justify-between gap-2 text-xs text-slate-700">
+                     <a href="mailto:${escapeAttr(proj.email)}" class="text-indigo-700 hover:underline truncate">${escapeHtml(proj.email)}</a>
+                     <button type="button" onclick="copyText('${escapeJs(proj.email)}', 'Email copied')" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[11px] font-medium">Copy</button>
+                   </div>`
+                : `<p class="text-xs text-slate-400">No email provided</p>`
+            }
+            ${
+              proj.phone
+                ? `<div class="flex items-center justify-between gap-2 text-xs text-slate-700">
+                     <span class="font-mono">${escapeHtml(proj.phone)}</span>
+                     <button type="button" onclick="copyText('${escapeJs(proj.phone)}', 'Contact copied')" class="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-[11px] font-medium">Copy</button>
+                   </div>`
+                : `<p class="text-xs text-slate-400">No phone / handle provided</p>`
+            }
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <label for="drawer-note-textarea" class="text-xs font-bold uppercase tracking-wider text-slate-500">Staff Note</label>
+              ${proj.noteUpdatedAt ? `<span class="text-[11px] text-slate-400">Saved ${formatRelativeTime(proj.noteUpdatedAt)}</span>` : ''}
+            </div>
+            <textarea
+              id="drawer-note-textarea"
+              rows="6"
+              placeholder="Write detailed staff notes, demo feedback, milestones, or payment notes..."
+              class="w-full p-3 text-xs sm:text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-slate-900 focus:outline-none"
+            >${escapeHtml(proj.note || '')}</textarea>
+            <button
+              type="button"
+              onclick="saveDrawerNote('${proj.id}')"
+              class="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
+            >
+              Save Staff Note
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function saveDrawerNote(id) {
+      const textarea = document.getElementById('drawer-note-textarea');
+      const proj = state.projects.find((p) => p.id === id);
+      if (!textarea || !proj) return;
+      const now = new Date().toISOString();
+      proj.note = textarea.value;
+      proj.noteUpdatedAt = now;
+      proj.updatedAt = now;
+      persistProjects();
+      renderAll();
+      showToast('Drawer note saved');
+    }
+
+    // --- DATABASE / JSON CONFIG MODAL ---
+    function openDbModal() {
+      state.confirmClearWorkspace = false;
+      const confirmBar = document.getElementById('db-clear-confirm-bar');
+      if (confirmBar) confirmBar.classList.add('hidden');
+
+      try {
+        const saved = JSON.parse(localStorage.getItem(SB_CONFIG_KEY) || '{}');
+        const urlEl = document.getElementById('sb-url');
+        const keyEl = document.getElementById('sb-key');
+        if (urlEl) urlEl.value = saved.url || '';
+        if (keyEl) keyEl.value = saved.key || '';
+      } catch (e) {}
+
+      const modal = document.getElementById('db-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeDbModal() {
+      const modal = document.getElementById('db-modal');
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function saveSupabaseConfig(event) {
+      event.preventDefault();
+      const urlEl = document.getElementById('sb-url');
+      const keyEl = document.getElementById('sb-key');
+      const config = {
+        url: urlEl ? urlEl.value.trim() : '',
+        key: keyEl ? keyEl.value.trim() : ''
+      };
+      try {
+        localStorage.setItem(SB_CONFIG_KEY, JSON.stringify(config));
+        showToast('Database endpoint settings saved locally');
+      } catch (e) {
+        showToast('Failed to save settings', 'error');
+      }
+    }
+
+    function exportJson() {
+      const dataStr = JSON.stringify(state.projects, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `staffflow-projects-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Exported JSON backup');
+    }
+
+    function importJson(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (!Array.isArray(parsed)) {
+            showToast('Invalid JSON: expected an array of projects.', 'error');
+            return;
+          }
+          const sanitized = parsed
+            .filter((item) => item && typeof item === 'object')
+            .map((item, idx) => ({
+              id: String(item.id || `imported-${Date.now()}-${idx}`),
+              title: String(item.title || 'Untitled Project'),
+              status: STATUS_META[item.status] ? item.status : 'PROJECTS',
+              price: Number.isFinite(Number(item.price)) ? Number(item.price) : 0,
+              clientName: String(item.clientName || item.client_name || 'Client'),
+              email: String(item.email || ''),
+              phone: String(item.phone || ''),
+              note: String(item.note || ''),
+              createdAt: item.createdAt || new Date().toISOString(),
+              updatedAt: item.updatedAt || new Date().toISOString(),
+              noteUpdatedAt: item.noteUpdatedAt || null
+            }));
+
+          state.projects = sanitized;
+          persistProjects();
+          closeDbModal();
+          renderAll();
+          showToast(`Imported ${sanitized.length} project(s)`);
+        } catch (err) {
+          showToast('Could not parse JSON file.', 'error');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function triggerClearAllFromModal() {
+      state.confirmClearWorkspace = true;
+      const confirmBar = document.getElementById('db-clear-confirm-bar');
+      if (confirmBar) confirmBar.classList.remove('hidden');
+    }
+
+    function requestClearWorkspace() {
+      state.confirmClearWorkspace = true;
+      renderAll();
+    }
+
+    function cancelClearWorkspace() {
+      state.confirmClearWorkspace = false;
+      const confirmBar = document.getElementById('db-clear-confirm-bar');
+      if (confirmBar) confirmBar.classList.add('hidden');
+      renderAll();
+    }
+
+    function confirmClearWorkspace() {
+      state.projects = [];
+      state.editingNoteId = null;
+      state.editingPriceId = null;
+      state.confirmDeleteId = null;
+      state.confirmClearWorkspace = false;
+      if (state.inspectingProjectId) {
+        closeInspectDrawer();
+      }
+      persistProjects();
+      const confirmBar = document.getElementById('db-clear-confirm-bar');
+      if (confirmBar) confirmBar.classList.add('hidden');
+      closeDbModal();
+      renderAll();
+      showToast('Workspace cleared — ready for new projects');
+    }
+
+    function copySchemaSql() {
+      const sql = `create table projects (
+  id text primary key,
+  title text not null,
+  client_name text not null,
+  price numeric default 0,
+  status text check (status in ('PROJECTS', 'FOR DEMO', 'ONGOING', 'COMPLETED')) default 'PROJECTS',
+  email text,
+  phone text,
+  note text,
+  updated_at timestamptz default now()
+);`;
+      copyText(sql, 'PostgreSQL / Supabase schema copied');
+    }
+
+    // --- CLIPBOARD & TOAST HELPERS ---
+    function copyText(text, message = 'Copied to clipboard') {
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(
+          () => showToast(message),
+          () => fallbackCopy(text, message)
+        );
+      } else {
+        fallbackCopy(text, message);
+      }
+    }
+
+    function fallbackCopy(text, message) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast(message);
+      } catch (e) {
+        showToast('Copy failed', 'error');
+      }
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+
+      const toast = document.createElement('div');
+      const isError = type === 'error';
+      toast.className = `pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg border transition-all ${
+        isError
+          ? 'bg-rose-950 text-rose-100 border-rose-800'
+          : 'bg-slate-900 text-white border-slate-800'
+      }`;
+      toast.innerHTML = `
+        <span>${escapeHtml(message)}</span>
+      `;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(6px)';
+        setTimeout(() => toast.remove(), 180);
+      }, 2400);
+    }
+
+    // --- FORMATTING & ESCAPE UTILITIES ---
+    function getNextStage(current) {
+      const order = ['PROJECTS', 'FOR DEMO', 'ONGOING', 'COMPLETED'];
+      const idx = order.indexOf(current);
+      return idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
+    }
+
+    function formatRelativeTime(isoString) {
+      if (!isoString) return 'just now';
+      const date = new Date(isoString);
+      const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+      if (diffSec < 10) return 'just now';
+      if (diffSec < 60) return `${diffSec}s ago`;
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay < 30) return `${diffDay}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function escapeAttr(str) {
+      return escapeHtml(str);
+    }
+
+    function escapeJs(str) {
+      return String(str ?? '')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, '\\n');
+    }
+  </script>
+</body>
+</html>
